@@ -87,25 +87,32 @@ check_env_vars() {
 
 # Function to backup database
 backup_database() {
-    if [ -d "$BACKUP_DIR" ]; then
-        print_status "Creating database backup..."
+    print_status "Checking for existing deployment to backup..."
+    
+    # Create backup directory if it doesn't exist
+    mkdir -p $BACKUP_DIR
+    
+    # Check if MongoDB container exists and is running
+    if docker ps --format "table {{.Names}}" | grep -q "insight360-mongodb"; then
+        print_status "Found running MongoDB container, attempting backup..."
         
         # Create backup directory with timestamp
         local backup_timestamp=$(date +"%Y%m%d_%H%M%S")
         local backup_path="$BACKUP_DIR/mongodb_backup_$backup_timestamp"
         
-        # Check if MongoDB container is running
-        if docker ps | grep -q "insight360-mongodb"; then
-            # Create backup
-            docker exec insight360-mongodb mongodump --uri="mongodb://$MONGO_ROOT_USERNAME:$MONGO_ROOT_PASSWORD@localhost:27017/insight360?authSource=admin" --out=/tmp/backup
-            docker cp insight360-mongodb:/tmp/backup $backup_path
-            print_success "Database backup created at $backup_path"
+        # Attempt backup with error handling
+        if docker exec insight360-mongodb sh -c "mkdir -p /tmp/backup && mongodump --uri='mongodb://$MONGO_ROOT_USERNAME:$MONGO_ROOT_PASSWORD@localhost:27017/insight360?authSource=admin' --out=/tmp/backup" 2>/dev/null; then
+            if docker cp insight360-mongodb:/tmp/backup $backup_path 2>/dev/null; then
+                print_success "Database backup created at $backup_path"
+            else
+                print_warning "Failed to copy backup from container, but continuing..."
+            fi
         else
-            print_warning "MongoDB container not running, skipping backup"
+            print_warning "Backup command failed, possibly no data to backup. Continuing with deployment..."
         fi
     else
-        mkdir -p $BACKUP_DIR
-        print_status "Created backup directory"
+        print_status "No existing MongoDB container found - this appears to be a first deployment"
+        print_status "Skipping backup step"
     fi
 }
 
@@ -241,16 +248,18 @@ main() {
     print_status "Starting Insight360 deployment process..."
     echo "Deployment started at $(date)" >> $LOG_FILE
     
-    # Trap errors for rollback
-    trap 'rollback' ERR
-    
     # Pre-deployment checks
     check_docker
     check_docker_compose
     check_env_vars
     
-    # Backup existing data
+    # Backup existing data (non-blocking)
+    set +e  # Temporarily disable exit on error for backup
     backup_database
+    set -e  # Re-enable exit on error
+    
+    # Trap errors for rollback (after backup)
+    trap 'rollback' ERR
     
     # Deploy application
     pull_images
