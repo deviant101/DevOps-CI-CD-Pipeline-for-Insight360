@@ -116,9 +116,8 @@ pull_images() {
     # Set image tag (use environment variable or default to latest)
     local image_tag=${IMAGE_TAG:-latest}
     
-    # Update environment file with new image tags
-    sed -i "s|image: .*insight360-backend.*|image: $DOCKER_HUB_USERNAME/insight360-backend:$image_tag|g" $COMPOSE_FILE
-    sed -i "s|image: .*insight360-frontend.*|image: $DOCKER_HUB_USERNAME/insight360-frontend:$image_tag|g" $COMPOSE_FILE
+    print_status "Using image tag: $image_tag"
+    print_status "Docker Hub username: $DOCKER_HUB_USERNAME"
     
     # Pull images
     $DOCKER_COMPOSE_CMD -f $COMPOSE_FILE pull

@@ -244,14 +244,13 @@ jobs:
 
       - name: Deploy to Azure VM
         run: |
-          # Create directory structure on Azure VM
-          ssh -o StrictHostKeyChecking=no ${{ secrets.AZURE_VM_USERNAME }}@${{ secrets.AZURE_VM_IP }} "mkdir -p ~/insight360/backend"
+          # Ensure insight360 directory exists
+          ssh -o StrictHostKeyChecking=no ${{ secrets.AZURE_VM_USERNAME }}@${{ secrets.AZURE_VM_IP }} "mkdir -p ~/insight360"
           
           # Copy deployment files to Azure VM
           scp -o StrictHostKeyChecking=no docker-compose.prod.yml ${{ secrets.AZURE_VM_USERNAME }}@${{ secrets.AZURE_VM_IP }}:~/insight360/
           scp -o StrictHostKeyChecking=no deploy/deploy.sh ${{ secrets.AZURE_VM_USERNAME }}@${{ secrets.AZURE_VM_IP }}:~/insight360/
           scp -o StrictHostKeyChecking=no deploy/.env.production ${{ secrets.AZURE_VM_USERNAME }}@${{ secrets.AZURE_VM_IP }}:~/insight360/.env
-          scp -o StrictHostKeyChecking=no backend/mongo-init.js ${{ secrets.AZURE_VM_USERNAME }}@${{ secrets.AZURE_VM_IP }}:~/insight360/backend/
 
           # Execute deployment script on Azure VM
           ssh -o StrictHostKeyChecking=no ${{ secrets.AZURE_VM_USERNAME }}@${{ secrets.AZURE_VM_IP }} << 'EOF'
