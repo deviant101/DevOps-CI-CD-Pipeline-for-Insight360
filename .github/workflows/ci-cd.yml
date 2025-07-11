@@ -1,0 +1,227 @@
+name: CI/CD Pipeline for Insight360
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  AZURE_VM_IP: ${{ secrets.AZURE_VM_IP }}
+  AZURE_VM_USERNAME: ${{ secrets.AZURE_VM_USERNAME }}
+  SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+  MONGO_ROOT_USERNAME: ${{ secrets.MONGO_ROOT_USERNAME }}
+  MONGO_ROOT_PASSWORD: ${{ secrets.MONGO_ROOT_PASSWORD }}
+  JWT_SECRET: ${{ secrets.JWT_SECRET }}
+  REACT_APP_NEWS_API_KEY: ${{ secrets.REACT_APP_NEWS_API_KEY }}
+
+jobs:
+  # Job 1: Lint and Build Frontend
+  frontend-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Lint frontend code
+        run: |
+          cd frontend
+          npm run lint --if-present
+
+      - name: Build frontend
+        env:
+          REACT_APP_API_URL: http://localhost:5000
+          REACT_APP_NEWS_API_KEY: ${{ secrets.REACT_APP_NEWS_API_KEY }}
+        run: |
+          cd frontend
+          npm run build
+
+      - name: Upload frontend build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: frontend/build/
+          retention-days: 1
+
+  # Job 2: Lint and Test Backend
+  backend-checks:
+    runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:7-jammy
+        env:
+          MONGO_INITDB_ROOT_USERNAME: root
+          MONGO_INITDB_ROOT_PASSWORD: example
+          MONGO_INITDB_DATABASE: insight360
+        ports:
+          - 27017:27017
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          npm ci
+
+      - name: Lint backend code
+        run: |
+          cd backend
+          npm run lint --if-present
+
+      - name: Run backend health check
+        env:
+          MONGO_URI: mongodb://root:example@localhost:27017/insight360?authSource=admin
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          NODE_ENV: test
+        run: |
+          cd backend
+          timeout 30s npm start &
+          sleep 10
+          curl -f http://localhost:5000/api/health || exit 1
+
+  # Job 3: Security Scanning
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # Job 4: Build Docker Images
+  build-images:
+    needs: [frontend-checks, backend-checks]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKER_HUB_USERNAME }}/insight360-backend:${{ github.sha }},${{ secrets.DOCKER_HUB_USERNAME }}/insight360-backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKER_HUB_USERNAME }}/insight360-frontend:${{ github.sha }},${{ secrets.DOCKER_HUB_USERNAME }}/insight360-frontend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Job 5: Deploy to Azure VM
+  deploy:
+    needs: [build-images, security-scan]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add Azure VM to known hosts
+        run: |
+          ssh-keyscan -H ${{ secrets.AZURE_VM_IP }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to Azure VM
+        run: |
+          # Copy deployment files to Azure VM
+          scp -o StrictHostKeyChecking=no docker-compose.prod.yml ${{ secrets.AZURE_VM_USERNAME }}@${{ secrets.AZURE_VM_IP }}:~/insight360/
+          scp -o StrictHostKeyChecking=no deploy/deploy.sh ${{ secrets.AZURE_VM_USERNAME }}@${{ secrets.AZURE_VM_IP }}:~/insight360/
+          scp -o StrictHostKeyChecking=no deploy/.env.production ${{ secrets.AZURE_VM_USERNAME }}@${{ secrets.AZURE_VM_IP }}:~/insight360/.env
+
+          # Execute deployment script on Azure VM
+          ssh -o StrictHostKeyChecking=no ${{ secrets.AZURE_VM_USERNAME }}@${{ secrets.AZURE_VM_IP }} << 'EOF'
+            cd ~/insight360
+            chmod +x deploy.sh
+            
+            # Set environment variables
+            export MONGO_ROOT_USERNAME="${{ secrets.MONGO_ROOT_USERNAME }}"
+            export MONGO_ROOT_PASSWORD="${{ secrets.MONGO_ROOT_PASSWORD }}"
+            export JWT_SECRET="${{ secrets.JWT_SECRET }}"
+            export REACT_APP_NEWS_API_KEY="${{ secrets.REACT_APP_NEWS_API_KEY }}"
+            export DOCKER_HUB_USERNAME="${{ secrets.DOCKER_HUB_USERNAME }}"
+            export IMAGE_TAG="${{ github.sha }}"
+            
+            # Run deployment
+            ./deploy.sh
+          EOF
+
+      - name: Health Check After Deployment
+        run: |
+          # Wait for services to start
+          sleep 30
+          
+          # Check backend health
+          curl -f http://${{ secrets.AZURE_VM_IP }}:5000/api/health || exit 1
+          
+          # Check frontend availability
+          curl -f http://${{ secrets.AZURE_VM_IP }}:80 || exit 1
+
+      - name: Notify deployment status
+        if: always()
+        run: |
+          if [ $? -eq 0 ]; then
+            echo "✅ Deployment successful!"
+            echo "🌐 Frontend: http://${{ secrets.AZURE_VM_IP }}"
+            echo "🔧 Backend: http://${{ secrets.AZURE_VM_IP }}:5000"
+          else
+            echo "❌ Deployment failed!"
+            exit 1
+          fi
