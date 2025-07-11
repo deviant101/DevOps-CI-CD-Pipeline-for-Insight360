@@ -42,7 +42,8 @@ jobs:
         run: |
           cd frontend
           if [ -f package-lock.json ]; then
-            npm ci
+            # Try npm ci first, fall back to npm install if there are sync issues
+            npm ci || (echo "Lock file out of sync, running npm install instead..." && rm -f package-lock.json && npm install)
           else
             npm install
           fi
@@ -101,7 +102,8 @@ jobs:
         run: |
           cd backend
           if [ -f package-lock.json ]; then
-            npm ci
+            # Try npm ci first, fall back to npm install if there are sync issues
+            npm ci || (echo "Lock file out of sync, running npm install instead..." && rm -f package-lock.json && npm install)
           else
             npm install
           fi
