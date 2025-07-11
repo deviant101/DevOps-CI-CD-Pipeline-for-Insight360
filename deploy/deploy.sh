@@ -144,23 +144,37 @@ deploy_application() {
     
     # Wait for services to be healthy
     print_status "Waiting for services to be healthy..."
-    local max_attempts=30
+    local max_attempts=40
     local attempt=1
     
     while [ $attempt -le $max_attempts ]; do
+        # Check MongoDB status specifically
+        mongo_status=$($DOCKER_COMPOSE_CMD -f $COMPOSE_FILE ps mongodb --format "table" | grep -v "NAME" || true)
+        print_status "MongoDB status: $mongo_status"
+        
+        # Check if all services are healthy
         if $DOCKER_COMPOSE_CMD -f $COMPOSE_FILE ps | grep -q "Up (healthy)"; then
-            print_success "Services are healthy"
+            print_success "All services are healthy"
             break
+        fi
+        
+        # Check if MongoDB is unhealthy and show logs
+        if echo "$mongo_status" | grep -q "unhealthy"; then
+            print_warning "MongoDB is unhealthy, showing recent logs..."
+            $DOCKER_COMPOSE_CMD -f $COMPOSE_FILE logs --tail=20 mongodb
         fi
         
         if [ $attempt -eq $max_attempts ]; then
             print_error "Services failed to become healthy after $max_attempts attempts"
-            $DOCKER_COMPOSE_CMD -f $COMPOSE_FILE logs
+            print_status "Showing all service logs..."
+            $DOCKER_COMPOSE_CMD -f $COMPOSE_FILE logs --tail=50
+            print_status "Showing service status..."
+            $DOCKER_COMPOSE_CMD -f $COMPOSE_FILE ps
             exit 1
         fi
         
         print_status "Attempt $attempt/$max_attempts - Waiting for services..."
-        sleep 10
+        sleep 15
         ((attempt++))
     done
 }
