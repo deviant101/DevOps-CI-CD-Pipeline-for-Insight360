@@ -1,0 +1,190 @@
+/* Header.css */
+.header {
+  margin-left: 100px;
+  margin-right: 100px;
+  padding: 0;
+  font-family: Arial, sans-serif;
+}
+
+/* First Row - Logo and Social Media Icons */
+.top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 25px;
+  padding-bottom: 15px;
+  /* background-color: aqua; */
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+}
+
+.logo img {
+  /* width: 120px; */
+  size: 100px;
+}
+
+.site-name {
+  font-size: 24px;
+  font-weight: bold;
+  margin-left: 10px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+}
+
+.sign-in {
+  /* margin-right: 20px; */
+  text-decoration: none;
+  color: black;
+  font-weight: bold;
+  font-size: large;
+  /* border-right: 1px solid darkgray; */
+}
+
+.social-icons {
+  display: flex;
+  align-items: center;
+}
+
+.social-icons a {
+  margin-left: 15px;
+  color: black;
+  font-size: 18px;
+  text-decoration: none;
+}
+
+/* Second Row - Navigation and Search Icon */
+.bottom-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid #474444;
+  border-bottom: 5px solid black;
+  padding: 10px 0;
+  /* background-color: lightgreen; */
+}
+
+.navigation ul {
+  display: flex;
+  list-style: none;
+  margin-top: 7px;
+  margin-bottom: 7px;
+  padding: 0;
+}
+
+.navigation ul li {
+  margin-right: 40px;
+}
+
+.navigation ul li a {
+  text-decoration: none;
+  color: black;
+  font-weight: bold;
+  font-size: 17px;
+}
+
+.navigation ul li a:hover {
+  color: #c70d0d;
+  animation-duration: 10ms;
+}
+
+.search-icon {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.search-input {
+  display: none;
+  margin-left: 10px;
+  padding: 5px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+
+.search-icon.active .search-input,
+.search-input:focus {
+  display: block;
+}
+
+.search-icon {
+  position: relative;
+  cursor: pointer;
+  display: flex;
+  /* Ensures proper alignment of icon and input */
+  align-items: center;
+  /* Vertically aligns icon and input */
+  transition: transform 0.3s ease;
+  /* Add transition for smooth movement */
+}
+
+.search-icon i {
+  font-size: 18px;
+  color: black;
+  transition: opacity 0.3s ease;
+  z-index: 2;
+  /* Ensure icon is above input when transitioning */
+}
+
+.search-input {
+  border: none;
+  /* Remove default border */
+  border-bottom: 2px solid red;
+  /* Add red underline border */
+  border-radius: 0;
+  /* Make it fully squared */
+  padding: 5px 10px;
+  font-size: 14px;
+  outline: none;
+  width: 0;
+  opacity: 0;
+
+  /* Position input relative to the parent for leftward transition */
+  position: relative;
+  left: 0;
+  top: 0;
+  transform: translateX(0);
+  /* Initial position */
+  transition: all 0.3s ease;
+
+  background-color: white;
+  /* White background */
+  color: black;
+  /* Initial text color - changed to black */
+}
+
+.search-input:focus,
+/* Animate on focus/typing */
+.search-input.active {
+  width: 200px;
+  opacity: 1;
+  color: black;
+  /* Text color when active - changed to black */
+  transform: translateX(0px);
+  /* Move input to the left by half */
+}
+
+.search-icon.active i {
+  opacity: 0;
+}
+
+.logout-button {
+  background-color: #ff4d4d;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  margin-left: 10px;
+  transition: background-color 0.3s ease;
+}
+
+.logout-button:hover {
+  background-color: #ff1a1a;
+}
