@@ -163,9 +163,15 @@ deploy_application() {
         mongo_status=$($DOCKER_COMPOSE_CMD -f $COMPOSE_FILE ps mongodb --format "table" | grep -v "NAME" || true)
         print_status "MongoDB status: $mongo_status"
         
-        # Check if all services are healthy
-        if $DOCKER_COMPOSE_CMD -f $COMPOSE_FILE ps | grep -q "Up (healthy)"; then
-            print_success "All services are healthy"
+        # Check if all services are healthy by counting healthy services
+        healthy_count=$($DOCKER_COMPOSE_CMD -f $COMPOSE_FILE ps --format "table {{.Name}}\t{{.Status}}" | grep -c "(healthy)" || echo "0")
+        total_services=$($DOCKER_COMPOSE_CMD -f $COMPOSE_FILE ps --format "table {{.Name}}" | grep -c "insight360-" || echo "0")
+        
+        print_status "Healthy services: $healthy_count/$total_services"
+        
+        # Check if all services are healthy (expecting 3: mongodb, backend, frontend)
+        if [ "$healthy_count" -eq "$total_services" ] && [ "$total_services" -eq 3 ]; then
+            print_success "All services are healthy ($healthy_count/$total_services)"
             break
         fi
         
@@ -177,6 +183,8 @@ deploy_application() {
         
         if [ $attempt -eq $max_attempts ]; then
             print_error "Services failed to become healthy after $max_attempts attempts"
+            print_status "Final status check:"
+            print_status "Healthy services: $healthy_count/$total_services"
             print_status "Showing all service logs..."
             $DOCKER_COMPOSE_CMD -f $COMPOSE_FILE logs --tail=50
             print_status "Showing service status..."
