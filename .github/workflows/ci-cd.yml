@@ -254,6 +254,13 @@ jobs:
             cd ~/insight360
             chmod +x deploy.sh
             
+            # Ensure Docker Compose is available
+            if ! command -v docker-compose >/dev/null 2>&1 && ! docker compose version >/dev/null 2>&1; then
+              echo "Installing Docker Compose V2..."
+              sudo apt-get update
+              sudo apt-get install -y docker-compose-plugin
+            fi
+            
             # Set environment variables
             export MONGO_ROOT_USERNAME="${{ secrets.MONGO_ROOT_USERNAME }}"
             export MONGO_ROOT_PASSWORD="${{ secrets.MONGO_ROOT_PASSWORD }}"

@@ -44,6 +44,28 @@ check_docker() {
     print_success "Docker is running"
 }
 
+# Function to check Docker Compose availability
+check_docker_compose() {
+    if command -v docker-compose >/dev/null 2>&1; then
+        DOCKER_COMPOSE_CMD="docker-compose"
+        print_success "Using Docker Compose standalone version"
+    elif docker compose version >/dev/null 2>&1; then
+        DOCKER_COMPOSE_CMD="docker compose"
+        print_success "Using Docker Compose V2 plugin"
+    else
+        print_error "Docker Compose not found. Installing Docker Compose V2..."
+        # Try to install docker-compose-plugin
+        if command -v apt-get >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y docker-compose-plugin
+            DOCKER_COMPOSE_CMD="docker compose"
+        else
+            print_error "Cannot install Docker Compose. Please install it manually."
+            exit 1
+        fi
+    fi
+}
+
 # Function to check if required environment variables are set
 check_env_vars() {
     local required_vars=(
@@ -99,7 +121,7 @@ pull_images() {
     sed -i "s|image: .*insight360-frontend.*|image: $DOCKER_HUB_USERNAME/insight360-frontend:$image_tag|g" $COMPOSE_FILE
     
     # Pull images
-    docker-compose -f $COMPOSE_FILE pull
+    $DOCKER_COMPOSE_CMD -f $COMPOSE_FILE pull
     print_success "Images pulled successfully"
 }
 
@@ -108,9 +130,9 @@ deploy_application() {
     print_status "Deploying Insight360 application..."
     
     # Stop existing containers gracefully
-    if docker-compose -f $COMPOSE_FILE ps -q | grep -q .; then
+    if $DOCKER_COMPOSE_CMD -f $COMPOSE_FILE ps -q | grep -q .; then
         print_status "Stopping existing containers..."
-        docker-compose -f $COMPOSE_FILE down --timeout 30
+        $DOCKER_COMPOSE_CMD -f $COMPOSE_FILE down --timeout 30
     fi
     
     # Remove unused images to free space
@@ -118,7 +140,7 @@ deploy_application() {
     
     # Start services
     print_status "Starting services..."
-    docker-compose -f $COMPOSE_FILE up -d
+    $DOCKER_COMPOSE_CMD -f $COMPOSE_FILE up -d
     
     # Wait for services to be healthy
     print_status "Waiting for services to be healthy..."
@@ -126,14 +148,14 @@ deploy_application() {
     local attempt=1
     
     while [ $attempt -le $max_attempts ]; do
-        if docker-compose -f $COMPOSE_FILE ps | grep -q "Up (healthy)"; then
+        if $DOCKER_COMPOSE_CMD -f $COMPOSE_FILE ps | grep -q "Up (healthy)"; then
             print_success "Services are healthy"
             break
         fi
         
         if [ $attempt -eq $max_attempts ]; then
             print_error "Services failed to become healthy after $max_attempts attempts"
-            docker-compose -f $COMPOSE_FILE logs
+            $DOCKER_COMPOSE_CMD -f $COMPOSE_FILE logs
             exit 1
         fi
         
@@ -177,7 +199,7 @@ health_check() {
 show_status() {
     print_status "Deployment Status:"
     echo "===========================================" | tee -a $LOG_FILE
-    docker-compose -f $COMPOSE_FILE ps | tee -a $LOG_FILE
+    $DOCKER_COMPOSE_CMD -f $COMPOSE_FILE ps | tee -a $LOG_FILE
     echo "===========================================" | tee -a $LOG_FILE
     echo "🌐 Frontend URL: http://$(curl -s ifconfig.me || echo 'localhost'):80" | tee -a $LOG_FILE
     echo "🔧 Backend URL: http://$(curl -s ifconfig.me || echo 'localhost'):5000" | tee -a $LOG_FILE
@@ -190,7 +212,7 @@ rollback() {
     print_error "Deployment failed, attempting rollback..."
     
     # Stop current containers
-    docker-compose -f $COMPOSE_FILE down --timeout 30
+    $DOCKER_COMPOSE_CMD -f $COMPOSE_FILE down --timeout 30
     
     # Try to start with previous images
     # This is a simplified rollback - in production you'd want to track previous versions
@@ -198,7 +220,7 @@ rollback() {
     
     # Show logs for debugging
     print_status "Recent logs:"
-    docker-compose -f $COMPOSE_FILE logs --tail=50
+    $DOCKER_COMPOSE_CMD -f $COMPOSE_FILE logs --tail=50
 }
 
 # Main deployment process
@@ -211,6 +233,7 @@ main() {
     
     # Pre-deployment checks
     check_docker
+    check_docker_compose
     check_env_vars
     
     # Backup existing data
