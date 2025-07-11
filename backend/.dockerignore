@@ -1,0 +1,7 @@
+# Add to backend .gitignore
+.env
+.env.production
+.env.local
+.env.staging
+deploy.log
+*.log
