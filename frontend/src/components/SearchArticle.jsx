@@ -16,16 +16,14 @@ const SearchArticle = () => {
             setLoading(true);
             setError('');
             try {
-                const response = await axios.get(`https://newsapi.org/v2/everything?q=${query}&sortBy=popularity&apiKey=${process.env.REACT_APP_NEWS_API_KEY}`);
-                if (response.data.articles.length > 0) {
-                    const filteredArticles = response.data.articles.filter(article => 
-                        article.urlToImage && article.title && article.description && !article.removed
-                    );
-                    setArticles(filteredArticles);
+                const response = await axios.get(`${process.env.REACT_APP_API_URL}/api/news/search?q=${query}&sortBy=popularity`);
+                if (response.data.status === 'success' && response.data.articles.length > 0) {
+                    setArticles(response.data.articles);
                 } else {
                     setArticles([]);
                 }
             } catch (error) {
+                console.error('Error fetching articles:', error);
                 setError('Error fetching articles');
             }
             setLoading(false);

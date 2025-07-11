@@ -33,6 +33,7 @@ services:
       - MONGO_URI=mongodb://${MONGO_ROOT_USERNAME:-root}:${MONGO_ROOT_PASSWORD:-example}@mongodb:27017/insight360?authSource=admin
       - JWT_SECRET=${JWT_SECRET:-7f4e0a86bcd844b89a8c62e1c235bc42f0e7e0e279b54688b08f9b2dc85d8ab0}
       - PORT=5000
+      - REACT_APP_NEWS_API_KEY=${REACT_APP_NEWS_API_KEY}
     depends_on:
       mongodb:
         condition: service_healthy
