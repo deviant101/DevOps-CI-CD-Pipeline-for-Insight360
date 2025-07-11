@@ -102,10 +102,15 @@ backup_database() {
         
         # Attempt backup with error handling
         if docker exec insight360-mongodb sh -c "mkdir -p /tmp/backup && mongodump --uri='mongodb://$MONGO_ROOT_USERNAME:$MONGO_ROOT_PASSWORD@localhost:27017/insight360?authSource=admin' --out=/tmp/backup" 2>/dev/null; then
-            if docker cp insight360-mongodb:/tmp/backup $backup_path 2>/dev/null; then
-                print_success "Database backup created at $backup_path"
+            # Check if backup directory actually contains data before copying
+            if docker exec insight360-mongodb sh -c "ls -la /tmp/backup" 2>/dev/null | grep -q "insight360"; then
+                if docker cp insight360-mongodb:/tmp/backup $backup_path 2>/dev/null; then
+                    print_success "Database backup created at $backup_path"
+                else
+                    print_warning "Failed to copy backup from container, but continuing..."
+                fi
             else
-                print_warning "Failed to copy backup from container, but continuing..."
+                print_warning "No database data found to backup (empty database). Continuing..."
             fi
         else
             print_warning "Backup command failed, possibly no data to backup. Continuing with deployment..."
