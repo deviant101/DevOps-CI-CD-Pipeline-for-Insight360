@@ -14,6 +14,8 @@ env:
   MONGO_ROOT_PASSWORD: ${{ secrets.MONGO_ROOT_PASSWORD }}
   JWT_SECRET: ${{ secrets.JWT_SECRET }}
   REACT_APP_NEWS_API_KEY: ${{ secrets.REACT_APP_NEWS_API_KEY }}
+  DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
+  DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
 
 jobs:
   # Job 1: Lint and Build Frontend
@@ -27,8 +29,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: 'frontend/package-lock.json'
+
+      - name: Cache frontend dependencies
+        uses: actions/cache@v3
+        with:
+          path: frontend/node_modules
+          key: ${{ runner.os }}-frontend-${{ hashFiles('frontend/package*.json') }}
+          restore-keys: |
+            ${{ runner.os }}-frontend-
 
       - name: Install frontend dependencies
         run: |
@@ -80,8 +88,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: 'backend/package-lock.json'
+
+      - name: Cache backend dependencies
+        uses: actions/cache@v3
+        with:
+          path: backend/node_modules
+          key: ${{ runner.os }}-backend-${{ hashFiles('backend/package*.json') }}
+          restore-keys: |
+            ${{ runner.os }}-backend-
 
       - name: Install backend dependencies
         run: |
@@ -165,6 +179,9 @@ jobs:
           file: ./frontend/Dockerfile
           push: true
           tags: ${{ secrets.DOCKER_HUB_USERNAME }}/insight360-frontend:${{ github.sha }},${{ secrets.DOCKER_HUB_USERNAME }}/insight360-frontend:latest
+          build-args: |
+            REACT_APP_API_URL=http://${{ secrets.AZURE_VM_IP }}:5000
+            REACT_APP_NEWS_API_KEY=${{ secrets.REACT_APP_NEWS_API_KEY }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

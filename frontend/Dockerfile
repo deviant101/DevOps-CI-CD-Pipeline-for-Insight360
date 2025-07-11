@@ -13,6 +13,14 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# Build arguments
+ARG REACT_APP_API_URL
+ARG REACT_APP_NEWS_API_KEY
+
+# Set environment variables for build
+ENV REACT_APP_API_URL=$REACT_APP_API_URL
+ENV REACT_APP_NEWS_API_KEY=$REACT_APP_NEWS_API_KEY
+
 # Build the application
 RUN npm run build
 

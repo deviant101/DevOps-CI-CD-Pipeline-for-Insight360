@@ -25,9 +25,7 @@ services:
 
   # Backend API
   backend:
-    build: 
-      context: ./backend
-      dockerfile: Dockerfile
+    image: ${DOCKER_HUB_USERNAME}/insight360-backend:latest
     container_name: insight360-backend
     restart: unless-stopped
     ports:
@@ -50,16 +48,11 @@ services:
 
   # Frontend Web App
   frontend:
-    build: 
-      context: ./frontend
-      dockerfile: Dockerfile
+    image: ${DOCKER_HUB_USERNAME}/insight360-frontend:latest
     container_name: insight360-frontend
     restart: unless-stopped
     ports:
       - "80:80"
-    environment:
-      - REACT_APP_API_URL=http://localhost:5000
-      - REACT_APP_NEWS_API_KEY=${REACT_APP_NEWS_API_KEY}
     depends_on:
       backend:
         condition: service_healthy
